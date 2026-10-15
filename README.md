@@ -15,7 +15,7 @@ dependencies are required.** It runs on Elixir 1.14+ / Erlang OTP 25+.
 Add this dependency to your application's `mix.exs`:
 
 ```elixir
-{:handwired, github: "kkondaurov/handwired-elixir", tag: "v0.2.0"}
+{:handwired, github: "kkondaurov/handwired-elixir", tag: "v0.2.1"}
 ```
 
 Then run `mix deps.get`. The library has no Hex dependencies.
