@@ -10,6 +10,15 @@ lowering pass, evaluator, reverse-mode differentiation, Adam/SGD training, and s
 runner are implemented in Elixir. **No JavaScript, Node, Bun, Nx, NIF, or package
 dependencies are required.** It runs on Elixir 1.14+ / Erlang OTP 25+.
 
+## Try the live demo
+
+[**Somewhere — an apartment picker that learns your preferences**](https://keyconstant.com/apartments/)
+
+Choose between six pairs of fictional apartments, then watch a fresh shortlist
+reorder around your trade-offs between rent, space, and commute. Switch between
+**Before your choices** and **For you** to see the difference. The learning runs
+in Elixir through Handwired's compiled affine/ReGLU circuit.
+
 ## Install from GitHub
 
 Add this dependency to your application's `mix.exs`:
