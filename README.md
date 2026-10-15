@@ -24,7 +24,7 @@ in Elixir through Handwired's compiled affine/ReGLU circuit.
 Add this dependency to your application's `mix.exs`:
 
 ```elixir
-{:handwired, github: "kkondaurov/handwired-elixir", tag: "v0.2.1"}
+{:handwired, github: "kkondaurov/handwired-elixir", tag: "v0.3.0"}
 ```
 
 Then run `mix deps.get`. The library has no Hex dependencies.
@@ -36,6 +36,7 @@ git clone https://github.com/kkondaurov/handwired-elixir.git
 cd handwired-elixir
 mix test --warnings-as-errors
 mix run examples/primitives.exs
+mix run examples/learner.exs
 # Or run the two applications separately:
 mix run examples/envelope.exs
 mix run examples/controller.exs
@@ -291,6 +292,97 @@ fit = Handwired.fit(circuit, examples, trainable: [:decay])
 Loss is not guaranteed to decrease on every Adam/SGD step. These are local
 optimizers, with inspectable objective history, rather than global solvers.
 
+## Persistent learning
+
+`Handwired.Learner` is an immutable value containing the current circuit,
+optimizer state, bounded replay buffer, and bounded undo checkpoints. It works
+with both semantic and lowered circuits. The application owns persistence and
+serializes updates to each learner (for example, in a GenServer).
+
+```elixir
+alias Handwired.Learner
+
+# circuit is a scalar scoring function with named trainable parameters.
+learner = Learner.new(circuit,
+  loss: :pairwise,
+  learning_rate: 0.03,
+  steps: 10,
+  replay_capacity: 64,
+  decay: 0.98,
+  anchor: 0.01)
+
+learner = Learner.prefer(learner, preferred_inputs, other_inputs)
+Learner.predict(learner, unseen_inputs)
+
+# Starting circuit, including its original parameter values, must match.
+bytes = Learner.dump(learner)
+restored = Learner.load(circuit, bytes)
+restored == learner  # true, including Adam moments and replay/undo state
+
+previous = Learner.undo(restored)
+original = Learner.reset(restored)
+```
+
+`examples/learner.exs` is a complete runnable preference-learning and persistence
+example. The [Somewhere demo](https://keyconstant.com/apartments/) uses this API
+for its pairwise apartment choices.
+
+| Loss | Feedback API | Circuit output |
+| --- | --- | --- |
+| `:mse` (default) | `Learner.observe(learner, inputs, target)` | Numeric prediction |
+| `:binary_cross_entropy` | `Learner.observe(learner, inputs, 0_or_1)` | **Logit**, not probability |
+| `:pairwise` | `Learner.prefer(learner, winner_inputs, loser_inputs)` | Scalar score; higher is preferred |
+
+Binary and pairwise losses use stable logistic arithmetic. Every score derivative
+comes from Handwired AD; the loss and optimizer execute outside the compiled
+program. `Learner.predict/2` returns the program's raw output, including raw logits
+for binary models. For a program already producing a probability, MSE can learn
+0/1 outcomes without changing the program's output convention.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `loss` | `:mse` | One of the three losses above |
+| `optimizer` | `:adam` | Adam or SGD; optimizer state continues between observations |
+| `learning_rate` | `0.03` | Positive step size |
+| `steps` | `1` | Updates per observation, 1–10,000 |
+| `trainable` | All parameters | Distinct parameter names permitted to change |
+| `replay_capacity` | `64` | Retain the newest 1–10,000 observations |
+| `decay` | `1.0` | Replay weight `decay ** age`, where age counts later observations; `(0, 1]` |
+| `anchor` | `0.0` | Nonnegative L2 penalty coefficient towards starting parameters |
+| `pairwise_scale` | `1.0` | Positive multiplier on winner-minus-loser score |
+| `undo_limit` | `32` | Retained pre-observation checkpoints, 0–1,000 |
+
+An update minimizes the normalized, recency-weighted replay loss plus
+`anchor * sum((parameter - initial_parameter)^2)` over trainable parameters.
+Parameters are projected into their declared ranges and rounded to the circuit
+precision. Loss accumulation and Adam moments use f64; the program and its
+parameter values retain the circuit's precision. Hard rules and frozen parameters
+stay fixed. All feedback must supply exactly the circuit's input names.
+
+`Learner.loss_and_grad/1` exposes the current replay objective and its gradients.
+`learner.observations`, `learner.step`, and `learner.last_loss` report progress.
+`undo/1` restores parameters, optimizer step/moments, replay, count, and loss;
+checkpoints older than the configured limit are discarded. Undo cannot recover
+already discarded checkpoints. `reset/1` restores the original prior and options.
+
+For JSON storage, use the string-keyed `Learner.snapshot/1` map and
+`Learner.restore(original_circuit, decoded_map)`. The library needs no JSON
+dependency. Snapshots have a schema version and a SHA-256 fingerprint of the
+original circuit, its numeric policy, and starting parameters. Restore rejects
+incompatible circuits and validates buffer shapes, input domains, parameter
+bounds, frozen parameters, and optimizer state. For local binary storage,
+`dump/1` uses uncompressed Erlang terms; `load/2` rejects compressed/trailing data
+and snapshots larger than 16 MiB. Both APIs preserve the same state.
+
+Snapshots contain feedback, are neither encrypted nor authenticated, and are not
+an authorization mechanism for client-supplied models. Applications own storage,
+atomic file replacement, event IDs/deduplication, and serialization of concurrent
+updates. Each `observe` or `prefer` call is a new observation, even with identical
+inputs. To remove or correct an event older than the undo window, rebuild from an
+application-owned event log. Snapshot size is bounded by replay/undo limits but
+also depends on input width; choose limits accordingly. Circuit edits require an
+explicit new learner or an application-owned migration/replay.
+
 ## Stateful programs
 
 A controller returns a map with fields matching its state input names:
@@ -334,6 +426,7 @@ mix format --check-formatted
 mix compile --warnings-as-errors
 mix test --warnings-as-errors
 mix run examples/primitives.exs
+mix run examples/learner.exs
 ```
 
 The tests cover independent native-Elixir comparisons, central-difference
@@ -362,6 +455,11 @@ reference.
 | `lib/handwired/evaluator.ex` | Forward execution and reverse differentiation |
 | `lib/handwired/number.ex` | Floating-point conversion and range checks |
 | `lib/handwired/trainer.ex` | MSE, Adam/SGD, fit results |
+| `lib/handwired/learner.ex` | Incremental feedback, replay, anchoring, undo/reset |
+| `lib/handwired/learner/snapshot.ex` | Versioned circuit-bound persistence |
+| `lib/handwired/optimizer.ex` | Shared Adam/SGD update rules |
 | `lib/handwired/machine.ex` | Explicit retained state and event execution |
 
 MIT licensed. See `NOTICE` and `LICENSE-UPSTREAM` for upstream attribution.
+
+See [CHANGELOG.md](CHANGELOG.md) for releases.

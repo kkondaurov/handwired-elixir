@@ -6,7 +6,9 @@ defmodule Handwired do
   `use Handwired` imports `defwire/2` and `relu/1`. A `defwire` definition also
   creates an ordinary Elixir function, useful as an independent reference.
   Compile with an external function capture, explicit input ranges, and initial
-  parameter values. See the README and executable examples for complete uses.
+  parameter values. For incremental feedback, persistent optimizer state and
+  replay/undo, see `Handwired.Learner`. See the README and executable examples
+  for complete uses.
   """
 
   defmacro __using__(_opts) do

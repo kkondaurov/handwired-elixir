@@ -23,7 +23,7 @@ defmodule Handwired.LoweringPrograms do
   defwire(train_zero(x, weight), do: x * weight)
   defwire(zero_max(x), do: max(x, 0))
   defwire(zero_min(x), do: min(x, 0))
-  defwire(numeric_condition(x), do: if(x, do: x + 1, else: x - 1))
+  defwire(numeric_condition(x), do: if(x, do: x + 1, else: 0))
   defwire(extreme_select(x), do: if(x > 0, do: 1.0e30, else: 1.0e-30))
   defwire(inferred_grid(x, y), do: if((x + y) * 0.5 > 4, do: x, else: y))
 end
