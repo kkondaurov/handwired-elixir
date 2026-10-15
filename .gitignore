@@ -1,0 +1,22 @@
+/_build/
+/deps/
+/cover/
+/doc/
+/erl_crash.dump
+*.ez
+
+# Local credentials, personal histories and generated model artifacts
+.env
+.env.*
+!.env.example
+.DS_Store
+/data/
+*.sqlite
+*.sqlite-*
+*.db
+model.bin
+model.bin.*
+online.bin
+online.bin.*
+evaluation.json
+runtime.json

@@ -1,0 +1,11 @@
+Handwired Elixir implements the programming model of Handwired by Cheng Lou:
+https://github.com/chenglou/handwired
+
+The reference inspected during this implementation was commit
+4ea7fcb27ebe93acf49b9f29a93e162b975bad46 (2026-10-15).
+
+Upstream Handwired is MIT licensed, Copyright (c) 2026 Cheng Lou.
+The sign-cascade planner and comparison constructions in Handwired.Lowering
+adapt planSignCascade, emitCascadeCompare, and emitIntegerBit from upstream
+src/runtime/numeric-ui-core.ts. The full upstream license is in LICENSE-UPSTREAM.
+No upstream JavaScript runtime or dependency is included in this project.
